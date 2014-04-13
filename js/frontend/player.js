@@ -1,13 +1,14 @@
 // Opens a streaming torrent client
 
-var videoStreamer = null;
-var playTorrent = window.playTorrent = function (torrent, subs, movieModel, callback, progressCallback) {
+var engine = null;
+var startPeerflix = function (torrent, subs, movieModel, callback, progressCallback, torrentName) {
 
-  videoStreamer ? $(document).trigger('videoExit') : null;
+  engine ? $(document).trigger('videoExit') : null;
+  torrentName = torrentName ? torrentName : torrent;
 
   // Create a unique file to cache the video (with a microtimestamp) to prevent read conflicts
   var tmpFolder = path.join(os.tmpDir(), 'Popcorn-Time')
-  var tmpFilename = ( torrent.toLowerCase().split('/').pop().split('.torrent').shift() ).slice(0,100);
+  var tmpFilename = ( torrentName.toLowerCase().split('/').pop().split('.torrent').shift() ).slice(0,100);
   tmpFilename = tmpFilename.replace(/([^a-zA-Z0-9-_])/g, '_') + '.mp4';
   var tmpFile = path.join(tmpFolder, tmpFilename);
 
@@ -17,69 +18,75 @@ var playTorrent = window.playTorrent = function (torrent, subs, movieModel, call
   // Start Peerflix
   var peerflix = require('peerflix');
 
-  videoStreamer = peerflix(torrent, {
+  engine = peerflix(torrent, {
     // Set the custom temp file
     path: tmpFile,
     //port: 554,
-    buffer: (1.5 * 1024 * 1024).toString(),
+    //buffer: (1.5 * 1024 * 1024).toString(),
     connections: numConnections
-  }, function (err, flix) {
-    if (err) throw err;
+  });
+  engine.on('ready', function () {
 
-    var started = Date.now(),
-      loadedTimeout;
+    var started = Date.now();
 
-    flix.server.on('listening', function () {
-      var href = 'http://127.0.0.1:' + flix.server.address().port + '/';
+    //var href = 'http://127.0.0.1:' + engine.server.address().port + '/';
 
-      loadedTimeout ? clearTimeout(loadedTimeout) : null;
-
-      var checkLoadingProgress = function () {
-
-        var now = flix.downloaded,
-          total = flix.selected.length,
-        // There's a minimum size before we start playing the video.
-        // Some movies need quite a few frames to play properly, or else the user gets another (shittier) loading screen on the video player.
-          targetLoadedSize = MIN_SIZE_LOADED > total ? total : MIN_SIZE_LOADED,
-          targetLoadedPercent = MIN_PERCENTAGE_LOADED * total / 100.0,
-
-          targetLoaded = Math.max(targetLoadedPercent, targetLoadedSize),
-
-          percent = now / targetLoaded * 100.0;
-
-        if (now > targetLoaded) {
-          if (typeof window.spawnVideoPlayer === 'function') {
-            window.spawnVideoPlayer(href, subs, movieModel);
-          }
-          if (typeof callback === 'function') {
-            callback(href, subs, movieModel);
-          }
-        } else {
-          typeof progressCallback == 'function' ? progressCallback( percent, now, total) : null;
-          loadedTimeout = setTimeout(checkLoadingProgress, 500);
-        }
-      };
-      checkLoadingProgress();
-
-
-      $(document).on('videoExit', function() {
-        if (loadedTimeout) { clearTimeout(loadedTimeout); }
-
+    $(document).on('videoExit', function() {
         // Keep the sidebar open
         $("body").addClass("sidebar-open").removeClass("loading");
 
         // Stop processes
-        flix.clearCache();
-        flix.destroy();
-        videoStreamer = null;
+        engine.destroy();
+        engine = null;
 
         // Unbind the event handler
         $(document).off('videoExit');
 
-        delete flix;
-      });
+        delete engine;
     });
   });
+  engine.on('error', function(err) {
+    throw err;
+  });
+  engine.on('peer', function(addr) {
+    engine.peers = engine.peers ? engine.peers : 1;
+  });
+  engine.on('download', function(i,buffer) {
+    engine.downloaded = engine.downloaded ? engine.downloaded+1 : 1;
+    var now = engine.downloaded,
+        total = engine.torrent.pieces.length,
+    // There's a minimum size before we start playing the video.
+    // Some movies need quite a few frames to play properly, or else the user gets another (shittier) loading screen on the video player.
+    targetLoadedPercent = MIN_PERCENTAGE_LOADED * total,
+
+    targetLoaded = targetLoadedPercent,
+
+    percent = now / total * 100.0;
+
+    if (now > targetLoaded) {
+      if (typeof window.spawnVideoPlayer === 'function') {
+         window.spawnVideoPlayer(engine.path+'/', subs, movieModel);
+      }
+      if (typeof callback === 'function') {
+         callback(engine.path, subs, movieModel);
+      }
+    } else {
+      typeof progressCallback == 'function' ? progressCallback( percent, now, total) : null;
+    }
+  });
+};
+var playTorrent = window.playOBTorrent = function (torrent, subs, movieModel, callback, progressCallback) {
+
+  var isMagnet = torrent.match(/magnet:/) !== null
+
+  if (isMagnet) {
+      startPeerflix(torrent, subs, movieModel, callback, progressCallback);
+  } else {
+    var request = require('request');
+    request({url:torrent, encoding:null}, function (error, response, body) {
+      startPeerflix(body, subs, movieModel, callback, progressCallback, torrent)
+    });
+  }
 
 };
 
