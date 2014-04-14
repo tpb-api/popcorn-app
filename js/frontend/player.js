@@ -29,8 +29,6 @@ var startPeerflix = function (torrent, subs, movieModel, callback, progressCallb
 
     var started = Date.now();
 
-    //var href = 'http://127.0.0.1:' + engine.server.address().port + '/';
-
     $(document).on('videoExit', function() {
         // Keep the sidebar open
         $("body").addClass("sidebar-open").removeClass("loading");
@@ -53,6 +51,9 @@ var startPeerflix = function (torrent, subs, movieModel, callback, progressCallb
   });
   engine.on('download', function(i,buffer) {
     engine.downloaded = engine.downloaded ? engine.downloaded+1 : 1;
+
+    var href = 'http://127.0.0.1:6881/';
+
     var now = engine.downloaded,
         total = engine.torrent.pieces.length,
     // There's a minimum size before we start playing the video.
@@ -65,10 +66,10 @@ var startPeerflix = function (torrent, subs, movieModel, callback, progressCallb
 
     if (now > targetLoaded) {
       if (typeof window.spawnVideoPlayer === 'function') {
-         window.spawnVideoPlayer(engine.path+'/', subs, movieModel);
+         window.spawnVideoPlayer(href, subs, movieModel);
       }
       if (typeof callback === 'function') {
-         callback(engine.path, subs, movieModel);
+         callback(href, subs, movieModel);
       }
     } else {
       typeof progressCallback == 'function' ? progressCallback( percent, now, total) : null;
