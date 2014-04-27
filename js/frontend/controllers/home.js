@@ -7,7 +7,7 @@ App.Controller.Home = function (page) {
         });
     }
 
-    var Scrapper = App.currentScrapper;
+    var Scrapper = App.Scrapers.Yts;
 
     var movieCollection = new Scrapper([], {
         keywords: null,

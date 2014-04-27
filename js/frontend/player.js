@@ -52,8 +52,6 @@ var startPeerflix = function (torrent, subs, movieModel, callback, progressCallb
   engine.on('download', function(i,buffer) {
     engine.downloaded = engine.downloaded ? engine.downloaded+1 : 1;
 
-    var href = 'http://127.0.0.1:6881/';
-
     var now = engine.downloaded,
         total = engine.torrent.pieces.length,
     // There's a minimum size before we start playing the video.
@@ -65,6 +63,7 @@ var startPeerflix = function (torrent, subs, movieModel, callback, progressCallb
     percent = now / total * 100.0;
 
     if (now > targetLoaded) {
+      var href = 'http://'+engine.server.address().address+':'+engine.server.address().port+'/';
       if (typeof window.spawnVideoPlayer === 'function') {
          window.spawnVideoPlayer(href, subs, movieModel);
       }
