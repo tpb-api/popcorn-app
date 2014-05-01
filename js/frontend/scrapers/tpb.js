@@ -45,45 +45,46 @@ var Tpb = Backbone.Collection.extend({
                 return;
             }
 
-            var imdbCodes = _.pluck(tpbData, 'ImdbCode');
-            //var traktMovieCollection = new trakt.MovieCollection(imdbCodes);
-            //traktMovieCollection.getSummaries(function(trakData) {
+            var imdbCodes = _.pluck(tpbData, 'imdb_id');
+            var traktMovieCollection = new trakt.MovieCollection(imdbCodes);
+            traktMovieCollection.getSummaries(function(trakData) {
                 tpbData.forEach(function (movie) {
                     // No imdb, no movie.
-                    //if( typeof movie.ImdbCode != 'string' || movie.ImdbCode.replace('tt', '') == '' ){ return; }
+		    movie.imdb_id = movie.imdb_id+''
+                    if( typeof movie.imdb_id != 'string' || movie.imdb_id.replace('tt', '') == '' ){ return; }
 
-                    //var traktInfo = _.find(trakData, function(trakMovie) { return trakMovie.imdb_id == movie.ImdbCode });
-                    /*if(traktInfo) {
+                    var traktInfo = _.find(trakData, function(trakMovie) { return trakMovie.imdb_id == movie.imdb_id });
+                    if(traktInfo) {
                         traktInfo.images.posterSmall = trakt.resizeImage(traktInfo.images.poster, '138');
                     } else {
                         traktInfo = {images:{}};
-                    }*/
+                    }
 
                     var torrents = {};
-                    torrents['720p'] = movie.torrent_link;
+                    torrents[movie.quality || '720p'] = movie.torrent_link;
 
-		    var year = movie.title.match(/[^0-9]([0-9]{4})[^0-9]/) ? movie.title.match(/[^0-9]([0-9]{4})[^0-9]/)[1] : 9999;
+		    var year = movie.year || movie.title.match(/[^0-9]([0-9]{4})[^0-9]/) ? movie.title.match(/[^0-9]([0-9]{4})[^0-9]/)[1] : 9999;
 
                     // Temporary object
                     var movieModel = {
-                        imdb:       movie.id,
+                        imdb:       movie.imdb_id,
                         title:      movie.title,
 			year:       year,
-//                        year:       movie.MovieYear,
-                        runtime:    0,
-                        synopsis:   "",
-                        voteAverage:10,
-			image:      '',
-                        bigImage:   '',
-			backdrop:   '',
+                        runtime:    +traktInfo.runtime || 0,
+                        synopsis:   traktInfo.overview || "",
+                        voteAverage:parseFloat(movie.MovieRating),
 
-                        quality:    '720p',
+                        image:      traktInfo.images.poster ? trakt.resizeImage(traktInfo.images.poster, '138') : '',
+                        bigImage:   traktInfo.images.poster ? trakt.resizeImage(traktInfo.images.poster, '300') : '',
+                        backdrop:   traktInfo.images.fanart,
+
+                        quality:    movie.quality || '720p',
                         torrent:    movie.torrent_link ? 'http:'+movie.torrent_link : movie.magnet_link,
                         torrents:   torrents,
                         videos:     {},
                         subtitles:  {},
-                        seeders:    movie.torrent_link ? 10000 : 100,
-                        leechers:   100,
+                        seeders:    movie.seeders,
+                        leechers:   movie.leechers,
 
                         // YTS do not provide metadata and subtitle
                         hasMetadata:false,
@@ -103,7 +104,7 @@ var Tpb = Backbone.Collection.extend({
                     }
 
                     // Set it's correspondent quality torrent URL.
-                    stored.torrents[movie.Quality] = movie.TorrentUrl;
+                    stored.torrents[movie.quality || '720p'] = movie.torrent_link;
 
                     // Push it if not currently on array.
                     if (movies.indexOf(stored) === -1) {
@@ -116,7 +117,7 @@ var Tpb = Backbone.Collection.extend({
                 console.log(movies);
                 return;
             })
-        //})
+        })
     }
 });
 
